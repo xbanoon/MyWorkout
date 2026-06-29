@@ -7,6 +7,7 @@
 <meta name="description" content="جدول تماريني الأسبوعي - المرحلة الأولى">
 <title>تماريني - المرحلة الأولى</title>
 <link rel="manifest" href="manifest.json">
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🏋️</text></svg>">
 <style>
   :root {
@@ -773,9 +774,10 @@
     <div class="history-list" id="historyList"></div>
 
     <div class="actions" style="margin-top:16px">
-      <button id="exportData" class="btn-ghost">📥 تصدير البيانات</button>
+      <button id="exportExcel" class="btn-success">📊 تصدير Excel</button>
+      <button id="exportData" class="btn-ghost">📥 نسخة JSON</button>
       <button id="importData" class="btn-ghost">📤 استيراد</button>
-      <button class="btn-danger" id="clearAll">🗑️ مسح كل البيانات</button>
+      <button class="btn-danger" id="clearAll">🗑️ مسح الكل</button>
     </div>
     <input type="file" id="importFile" accept="application/json" style="display:none">
   </div>
@@ -1613,6 +1615,86 @@ function renderChart(name, data) {
 }
 
 // Data IO
+$('exportExcel').onclick = () => {
+  if (typeof XLSX === 'undefined') {
+    toast('مكتبة Excel لم تُحمّل بعد — جرب مجدداً', 'error');
+    return;
+  }
+  const wb = XLSX.utils.book_new();
+
+  // Sheet 1: Sessions
+  const sessionRows = [['التاريخ','اليوم','النوع','تمرين 1','تمرين 2','تمرين 3','تمرين 4','تمرين 5','الوزن (kg)','المجموعات × التكرار','الأنشطة المنجزة','الأنشطة غير المنجزة','ملاحظات']];
+  state.sessions.slice().sort((a,b) => a.date.localeCompare(b.date)).forEach(s => {
+    const dayIdx = new Date(s.date + 'T00:00:00').getDay();
+    const exs = s.exercises || [];
+    const row = [s.date, DAYS[dayIdx], 'Workout ' + s.workout];
+    const names = [], weights = [], reps = [];
+    for (let k = 0; k < 5; k++) {
+      const e = exs[k];
+      if (!e) { names.push(''); continue; }
+      names.push(e.name);
+      const validSets = (e.sets || []).filter(x => x.weight || x.reps);
+      if (validSets.length) {
+        weights.push(`${e.name}: ${validSets.map(st => st.weight||'-').join('/')}`);
+        reps.push(`${e.name}: ${validSets.length}×(${validSets.map(st => st.reps||'-').join('/')})`);
+      }
+    }
+    row.push(...names);
+    row.push(weights.join('  |  '));
+    row.push(reps.join('  |  '));
+    const acts = s.activities || [];
+    row.push(acts.filter(a => a.done).map(a => a.text).join(' / '));
+    row.push(acts.filter(a => !a.done).map(a => a.text).join(' / '));
+    row.push(s.notes || '');
+    sessionRows.push(row);
+  });
+  const wsSessions = XLSX.utils.aoa_to_sheet(sessionRows);
+  wsSessions['!cols'] = [{wch:12},{wch:10},{wch:12},{wch:22},{wch:22},{wch:22},{wch:22},{wch:22},{wch:36},{wch:36},{wch:30},{wch:30},{wch:40}];
+  if (sessionRows.length > 1) wsSessions['!autofilter'] = { ref: `A1:M${sessionRows.length}` };
+  XLSX.utils.book_append_sheet(wb, wsSessions, 'سجل الجلسات');
+
+  // Sheet 2 & 3: Workout A / B templates
+  ['A','B'].forEach(key => {
+    const rows = [['التمرين','المجموعات','التكرارات','الراحة (ثانية)','الملاحظات']];
+    state.workouts[key].forEach(ex => rows.push([ex.name, ex.sets, ex.reps, ex.rest, ex.coach || '']));
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = [{wch:30},{wch:12},{wch:14},{wch:14},{wch:50}];
+    XLSX.utils.book_append_sheet(wb, ws, `Workout ${key}`);
+  });
+
+  // Sheet 4: Weekly schedule
+  const schedRows = [['اليوم','نوع التمرين','الأنشطة الافتراضية']];
+  DAY_KEYS.forEach((k, i) => {
+    const t = state.schedule[k];
+    const label = t === 'rest' ? 'راحة' : 'Workout ' + t;
+    const acts = (state.activities[k] || []).map(a => a.text).join(' / ');
+    schedRows.push([DAYS[i], label, acts]);
+  });
+  const wsSched = XLSX.utils.aoa_to_sheet(schedRows);
+  wsSched['!cols'] = [{wch:14},{wch:16},{wch:60}];
+  XLSX.utils.book_append_sheet(wb, wsSched, 'الجدول الأسبوعي');
+
+  // Sheet 5: Day plans (per-date overrides)
+  const planDates = Object.keys(state.dayPlans || {}).sort();
+  if (planDates.length) {
+    const planRows = [['التاريخ','اليوم','نوع التمرين','الأنشطة المنجزة','الأنشطة غير المنجزة']];
+    planDates.forEach(d => {
+      const p = state.dayPlans[d];
+      const dayIdx = new Date(d + 'T00:00:00').getDay();
+      const label = p.type === 'rest' ? 'راحة' : 'Workout ' + p.type;
+      const done = p.activities.filter(a => a.done).map(a => a.text).join(' / ');
+      const todo = p.activities.filter(a => !a.done).map(a => a.text).join(' / ');
+      planRows.push([d, DAYS[dayIdx], label, done, todo]);
+    });
+    const wsPlans = XLSX.utils.aoa_to_sheet(planRows);
+    wsPlans['!cols'] = [{wch:12},{wch:10},{wch:14},{wch:40},{wch:40}];
+    XLSX.utils.book_append_sheet(wb, wsPlans, 'خطط الأيام');
+  }
+
+  XLSX.writeFile(wb, `Tamarini_${todayStrPlain()}.xlsx`);
+  toast('✅ تم تصدير ملف Excel', 'success');
+};
+
 $('exportData').onclick = () => {
   const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
