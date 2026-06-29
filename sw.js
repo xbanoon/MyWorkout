@@ -1,4 +1,4 @@
-const CACHE = 'tamarini-v2';
+const CACHE = 'tamarini-v3';
 const ASSETS = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', (e) => {

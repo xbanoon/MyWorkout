@@ -3,34 +3,47 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#1e3a8a">
+<meta name="theme-color" content="#18181b">
 <meta name="description" content="جدول تماريني الأسبوعي - المرحلة الأولى">
 <title>تماريني - المرحلة الأولى</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🏋️</text></svg>">
 <style>
   :root {
-    --bg: #f1f5f9;
+    --bg: #f4f4f5;
     --surface: #ffffff;
-    --primary: #1e3a8a;
-    --primary-light: #3b82f6;
-    --success: #16a34a;
-    --danger: #dc2626;
-    --warning: #f59e0b;
-    --text: #1f2937;
-    --text-muted: #64748b;
-    --border: #e5e7eb;
-    --shadow: 0 4px 12px rgba(0,0,0,0.08);
+    --primary: #27272a;
+    --primary-light: #52525b;
+    --accent: #18181b;
+    --success: #3f3f46;
+    --danger: #71717a;
+    --warning: #a1a1aa;
+    --text: #18181b;
+    --text-muted: #71717a;
+    --border: #e4e4e7;
+    --shade-1: #fafafa;
+    --shade-2: #f4f4f5;
+    --shade-3: #e4e4e7;
+    --shade-4: #a1a1aa;
+    --shadow: 0 4px 12px rgba(0,0,0,0.06);
   }
   [data-theme="dark"] {
-    --bg: #0f172a;
-    --surface: #1e293b;
-    --primary: #3b82f6;
-    --primary-light: #60a5fa;
-    --text: #f1f5f9;
-    --text-muted: #94a3b8;
-    --border: #334155;
-    --shadow: 0 4px 12px rgba(0,0,0,0.4);
+    --bg: #09090b;
+    --surface: #18181b;
+    --primary: #d4d4d8;
+    --primary-light: #a1a1aa;
+    --accent: #fafafa;
+    --success: #a1a1aa;
+    --danger: #71717a;
+    --warning: #d4d4d8;
+    --text: #fafafa;
+    --text-muted: #a1a1aa;
+    --border: #27272a;
+    --shade-1: #18181b;
+    --shade-2: #27272a;
+    --shade-3: #3f3f46;
+    --shade-4: #52525b;
+    --shadow: 0 4px 12px rgba(0,0,0,0.5);
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html { -webkit-text-size-adjust: 100%; }
@@ -43,16 +56,23 @@
     padding-bottom: env(safe-area-inset-bottom);
     transition: background 0.3s, color 0.3s;
   }
-  .container { max-width: 1100px; margin: 0 auto; }
+  .container {
+    max-width: 760px;
+    margin: 0 auto;
+    min-height: calc(100vh - 24px);
+    display: flex;
+    flex-direction: column;
+  }
   header {
-    background: linear-gradient(135deg, #b91c1c, #dc2626);
-    color: #fff;
-    padding: 14px 20px;
+    background: var(--accent);
+    color: var(--surface);
+    padding: 16px 20px;
     border-radius: 12px 12px 0 0;
     display: flex;
     justify-content: space-between;
     align-items: center;
     gap: 10px;
+    border-bottom: 1px solid var(--shade-4);
   }
   header h1 { font-size: 1.05rem; font-weight: 700; }
   .theme-toggle {
@@ -107,7 +127,8 @@
     border: 2px solid transparent;
     transition: transform 0.15s;
   }
-  .day-card.today { border-color: var(--warning); }
+  .day-card.today { border-color: var(--accent); }
+  .day-card.selected { background: var(--shade-3); border-color: var(--primary-light); }
   .day-name {
     font-weight: 700;
     color: var(--primary);
@@ -123,9 +144,9 @@
     cursor: pointer;
     user-select: none;
   }
-  .type-A { background: var(--success); color: #fff; }
-  .type-B { background: var(--primary-light); color: #fff; }
-  .type-rest { background: #94a3b8; color: #fff; }
+  .type-A { background: var(--accent); color: var(--surface); }
+  .type-B { background: var(--primary-light); color: var(--surface); }
+  .type-rest { background: var(--shade-3); color: var(--text-muted); }
   .day-status { margin-top: 4px; font-size: 1.1rem; }
 
   /* Workout */
@@ -137,17 +158,78 @@
     gap: 10px;
     margin-bottom: 14px;
     padding: 12px 16px;
-    background: var(--primary);
-    color: #fff;
+    background: var(--accent);
+    color: var(--surface);
     border-radius: 10px;
   }
   .workout-header h2 { font-size: 1.1rem; }
+  .workout-header select { background: var(--surface); color: var(--text); }
   .exercise-card {
-    background: var(--bg);
+    background: var(--shade-1);
+    border: 1px solid var(--border);
     border-radius: 10px;
     padding: 14px;
     margin-bottom: 12px;
-    border-right: 4px solid var(--primary);
+    border-right: 4px solid var(--accent);
+  }
+
+  /* Activities */
+  .activities-panel {
+    background: var(--shade-1);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    margin-top: 12px;
+  }
+  .activities-panel h3 {
+    color: var(--accent);
+    font-size: 1rem;
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+  .activity-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .activity-row:last-child { border-bottom: none; }
+  .activity-row label {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+  }
+  .activity-row input[type="checkbox"] {
+    width: 18px; height: 18px;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+  .activity-row .activity-text {
+    flex: 1;
+    padding: 4px 6px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text);
+  }
+  .activity-row .activity-text:focus {
+    border-color: var(--border);
+    background: var(--surface);
+    outline: none;
+  }
+  .activity-row.done .activity-text { text-decoration: line-through; color: var(--text-muted); }
+  .add-activity-bar {
+    display: flex;
+    gap: 6px;
+    margin-top: 10px;
+  }
+  .add-activity-bar select, .add-activity-bar input {
+    flex: 1;
   }
   .ex-header {
     display: flex;
@@ -336,11 +418,12 @@
     margin-bottom: 20px;
   }
   .stat-card {
-    background: linear-gradient(135deg, var(--primary), var(--primary-light));
-    color: #fff;
+    background: var(--accent);
+    color: var(--surface);
     padding: 16px;
     border-radius: 12px;
     text-align: center;
+    border: 1px solid var(--border);
   }
   .stat-value { font-size: 1.8rem; font-weight: 800; }
   .stat-label { font-size: 0.8rem; opacity: 0.95; margin-top: 4px; }
@@ -353,12 +436,12 @@
     margin: 8px 0;
   }
   .progress-fill {
-    background: linear-gradient(90deg, var(--success), #22c55e);
+    background: var(--accent);
     height: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #fff;
+    color: var(--surface);
     font-weight: 700;
     font-size: 0.8rem;
     transition: width 0.4s;
@@ -459,9 +542,10 @@
     </div>
     <h2 class="section-title">الجدول الأسبوعي</h2>
     <div class="week-grid" id="weekGrid"></div>
-    <p style="color:var(--text-muted);font-size:0.85rem;line-height:1.6">
-      💡 اضغط على <strong>نوع اليوم</strong> لتبديله (A / B / راحة). اضغط على <strong>اسم اليوم</strong> للذهاب إلى تمرينه.
+    <p style="color:var(--text-muted);font-size:0.82rem;line-height:1.6">
+      💡 اضغط <strong>نوع اليوم</strong> لتبديله (A / B / راحة) · <strong>اسم اليوم</strong> لفتح التمرين · <strong>أي مكان آخر</strong> لإدارة الأنشطة.
     </p>
+    <div class="activities-panel" id="activitiesPanel"></div>
   </div>
 
   <!-- Workout -->
@@ -545,6 +629,30 @@ const DEFAULT_SCHEDULE = { mon:'B', tue:'rest', wed:'A', thu:'rest', fri:'rest',
 
 const STORAGE_KEY = 'phase1_state_v2';
 
+const DEFAULT_ACTIVITY_PRESETS = [
+  'PREHAB Routine',
+  'Brisk Walking 40-60 min',
+  'ABS Circuit',
+  'HIT Workout',
+  'Cardio Alternative',
+  'Stretching / Mobility',
+  'Foam Rolling'
+];
+
+const DEFAULT_DAY_ACTIVITIES = {
+  mon: [{ text: 'PREHAB Routine (Post-workout)', done: false }],
+  tue: [{ text: 'Brisk Walking 40-60 min', done: false }],
+  wed: [
+    { text: 'ABS Circuit', done: false },
+    { text: 'HIT Workout', done: false },
+    { text: 'PREHAB Routine', done: false }
+  ],
+  thu: [{ text: 'Brisk Walking 40-60 min', done: false }],
+  fri: [{ text: 'Brisk Walking 40-60 min', done: false }],
+  sat: [{ text: 'Brisk Walking 40-60 min', done: false }],
+  sun: [{ text: 'Brisk Walking 40-60 min', done: false }]
+};
+
 function defaultState() {
   return {
     schedule: {...DEFAULT_SCHEDULE},
@@ -552,7 +660,10 @@ function defaultState() {
     sessions: [],
     currentWorkout: 'A',
     draft: {},
-    theme: 'light'
+    theme: 'light',
+    activities: JSON.parse(JSON.stringify(DEFAULT_DAY_ACTIVITIES)),
+    activityPresets: [...DEFAULT_ACTIVITY_PRESETS],
+    selectedDay: (new Date().getDay() + 6) % 7
   };
 }
 
@@ -561,6 +672,9 @@ try {
   state = JSON.parse(localStorage.getItem(STORAGE_KEY)) || defaultState();
   // migrate
   if (!state.workouts) state = defaultState();
+  if (!state.activities) state.activities = JSON.parse(JSON.stringify(DEFAULT_DAY_ACTIVITIES));
+  if (!state.activityPresets) state.activityPresets = [...DEFAULT_ACTIVITY_PRESETS];
+  if (state.selectedDay == null) state.selectedDay = (new Date().getDay() + 6) % 7;
 } catch { state = defaultState(); }
 
 function save() {
@@ -615,29 +729,95 @@ function renderSchedule() {
   DAY_KEYS.forEach((k, i) => {
     const type = state.schedule[k];
     const card = document.createElement('div');
-    card.className = 'day-card' + (i === todayIdx ? ' today' : '');
+    const isSelected = state.selectedDay === i;
+    card.className = 'day-card' + (i === todayIdx ? ' today' : '') + (isSelected ? ' selected' : '');
     const typeClass = type === 'A' ? 'type-A' : type === 'B' ? 'type-B' : 'type-rest';
     const typeLabel = type === 'rest' ? 'راحة' : 'Workout ' + type;
     const dateStr = getDateForDay(i);
     const done = state.sessions.some(s => s.date === dateStr);
+    const actCount = (state.activities[k] || []).length;
+    const actDone = (state.activities[k] || []).filter(a => a.done).length;
     card.innerHTML = `
       <div class="day-name" role="button" tabindex="0">${DAYS[i]}</div>
       <div class="day-type ${typeClass}" role="button" tabindex="0">${typeLabel}</div>
       <div class="day-status" aria-label="${done ? 'مكتمل' : 'غير مكتمل'}">${done ? '✅' : (type==='rest'?'😴':'⏳')}</div>
+      ${actCount ? `<div style="font-size:0.7rem;color:var(--text-muted);margin-top:4px">${actDone}/${actCount}</div>` : ''}
     `;
-    card.querySelector('.day-type').onclick = () => {
+    card.onclick = (e) => {
+      // Don't override children's specific click
+      if (e.target.closest('.day-type') || e.target.closest('.day-name')) return;
+      state.selectedDay = i;
+      save(); renderSchedule();
+    };
+    card.querySelector('.day-type').onclick = (e) => {
+      e.stopPropagation();
       const order = ['A','B','rest'];
       state.schedule[k] = order[(order.indexOf(type)+1) % 3];
       save(); renderSchedule();
     };
-    card.querySelector('.day-name').onclick = () => {
+    card.querySelector('.day-name').onclick = (e) => {
+      e.stopPropagation();
+      state.selectedDay = i;
       if (type !== 'rest') {
         state.currentWorkout = type;
         document.querySelector('.tab[data-tab="workout"]').click();
+      } else {
+        save(); renderSchedule();
       }
     };
     grid.appendChild(card);
   });
+  renderActivities();
+}
+
+function renderActivities() {
+  const panel = $('activitiesPanel');
+  const i = state.selectedDay;
+  const k = DAY_KEYS[i];
+  const acts = state.activities[k] || (state.activities[k] = []);
+  const presets = state.activityPresets;
+  panel.innerHTML = `
+    <h3>📋 أنشطة يوم ${DAYS[i]}</h3>
+    ${acts.length === 0 ? '<div style="color:var(--text-muted);font-size:0.85rem;text-align:center;padding:10px">لا توجد أنشطة لهذا اليوم — أضف من القائمة بالأسفل</div>' : ''}
+    ${acts.map((a, idx) => `
+      <div class="activity-row ${a.done ? 'done' : ''}">
+        <input type="checkbox" ${a.done ? 'checked' : ''} data-act-toggle="${idx}" aria-label="إنجاز">
+        <input class="activity-text" type="text" value="${escapeHtml(a.text)}" data-act-edit="${idx}">
+        <button class="btn-sm btn-ghost" data-act-del="${idx}" aria-label="حذف">✕</button>
+      </div>
+    `).join('')}
+    <div class="add-activity-bar">
+      <select id="presetSelect">
+        <option value="">— اختر نشاط جاهز —</option>
+        ${presets.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('')}
+      </select>
+      <button id="addPresetBtn">إضافة</button>
+      <button id="addCustomBtn" class="btn-ghost">+ مخصص</button>
+    </div>
+  `;
+  panel.querySelectorAll('[data-act-toggle]').forEach(cb => {
+    cb.onchange = () => { acts[+cb.dataset.actToggle].done = cb.checked; save(); renderSchedule(); };
+  });
+  panel.querySelectorAll('[data-act-edit]').forEach(inp => {
+    inp.oninput = () => { acts[+inp.dataset.actEdit].text = inp.value; save(); };
+  });
+  panel.querySelectorAll('[data-act-del]').forEach(b => {
+    b.onclick = () => { acts.splice(+b.dataset.actDel, 1); save(); renderSchedule(); };
+  });
+  $('addPresetBtn').onclick = () => {
+    const v = $('presetSelect').value;
+    if (!v) return toast('اختر نشاط من القائمة', 'error');
+    acts.push({ text: v, done: false });
+    save(); renderSchedule();
+  };
+  $('addCustomBtn').onclick = () => {
+    const name = prompt('اسم النشاط الجديد:');
+    if (!name || !name.trim()) return;
+    const trimmed = name.trim();
+    acts.push({ text: trimmed, done: false });
+    if (!state.activityPresets.includes(trimmed)) state.activityPresets.push(trimmed);
+    save(); renderSchedule();
+  };
 }
 
 function getDateForDay(dayIdx) {
