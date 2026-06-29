@@ -112,6 +112,61 @@
   }
   .panel.active { display: block; }
 
+  /* Workout previews on schedule */
+  .workout-previews {
+    display: flex;
+    gap: 8px;
+    margin-top: 14px;
+    flex-wrap: wrap;
+  }
+  .workout-previews .preview-toggle {
+    flex: 1 1 200px;
+    min-height: 44px;
+  }
+  .workout-previews .preview-toggle.active {
+    background: var(--accent);
+    color: var(--surface);
+    border-color: var(--accent);
+  }
+  .preview-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 12px;
+    font-size: 0.85rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .preview-table thead { background: var(--accent); color: var(--surface); }
+  .preview-table th { padding: 8px; text-align: right; font-size: 0.8rem; }
+  .preview-table td {
+    padding: 8px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  .preview-table tr:last-child td { border-bottom: none; }
+  .preview-table tbody tr:nth-child(odd) td { background: var(--shade-1); }
+  .preview-table .ex-name-cell { direction: ltr; text-align: left; font-weight: 700; color: var(--accent); }
+  .preview-table .coach-cell { font-size: 0.75rem; color: var(--text-muted); }
+  @media (max-width: 700px) {
+    .preview-table, .preview-table tbody, .preview-table tr, .preview-table td { display: block; width: 100%; }
+    .preview-table thead { display: none; }
+    .preview-table tr { margin-bottom: 8px; border-bottom: 2px solid var(--border); padding: 6px; }
+    .preview-table td {
+      border: none;
+      padding: 3px 6px;
+      display: flex;
+      gap: 8px;
+    }
+    .preview-table td::before {
+      content: attr(data-label);
+      font-weight: 700;
+      color: var(--text-muted);
+      min-width: 80px;
+      font-size: 0.75rem;
+    }
+  }
+
   /* Week nav */
   .week-nav {
     display: flex;
@@ -515,6 +570,7 @@
   .history-table tbody tr:nth-child(odd) td { background: var(--shade-1); }
   .history-table tbody tr.note-row td { background: var(--shade-2) !important; border-bottom: 1px solid var(--border); }
   .history-table .cell-ltr { direction: ltr; text-align: left; font-size: 0.78rem; line-height: 1.5; }
+  .history-table .cell-mono { font-family: 'Consolas', 'Courier New', monospace; font-size: 0.75rem; }
   .history-table .cell-action { width: 1%; white-space: nowrap; text-align: center; }
   @media (max-width: 700px) {
     .history-table thead { display: none; }
@@ -670,6 +726,12 @@
       💡 اضغط <strong>نوع اليوم</strong> لتبديله (A / B / راحة) · <strong>اسم اليوم</strong> لفتح التمرين · <strong>أي مكان آخر</strong> لإدارة الأنشطة.
     </p>
     <div class="activities-panel" id="activitiesPanel"></div>
+
+    <div class="workout-previews">
+      <button class="preview-toggle btn-ghost" data-preview="A">📋 عرض جدول Workout A</button>
+      <button class="preview-toggle btn-ghost" data-preview="B">📋 عرض جدول Workout B</button>
+    </div>
+    <div id="previewPanel"></div>
   </div>
 
   <!-- Workout -->
@@ -965,6 +1027,47 @@ $('todayBtn').onclick = () => {
   state.selectedDay = new Date().getDay();
   save(); renderSchedule();
 };
+
+let activePreview = null;
+function renderPreview() {
+  const panel = $('previewPanel');
+  document.querySelectorAll('.preview-toggle').forEach(b => {
+    b.classList.toggle('active', b.dataset.preview === activePreview);
+  });
+  if (!activePreview) { panel.innerHTML = ''; return; }
+  const list = state.workouts[activePreview];
+  panel.innerHTML = `
+    <h3 style="color:var(--accent);margin-top:16px;font-size:1rem">Workout ${activePreview}</h3>
+    <table class="preview-table">
+      <thead>
+        <tr>
+          <th>التمرين</th>
+          <th>المجموعات</th>
+          <th>التكرارات</th>
+          <th>الراحة</th>
+          <th>الملاحظات</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${list.map(ex => `
+          <tr>
+            <td data-label="التمرين" class="ex-name-cell">${escapeHtml(ex.name)}</td>
+            <td data-label="المجموعات">${ex.sets}</td>
+            <td data-label="التكرارات">${escapeHtml(ex.reps)}</td>
+            <td data-label="الراحة">${ex.rest}s</td>
+            <td data-label="الملاحظات" class="coach-cell">${escapeHtml(ex.coach || '')}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+}
+document.querySelectorAll('.preview-toggle').forEach(b => {
+  b.onclick = () => {
+    activePreview = activePreview === b.dataset.preview ? null : b.dataset.preview;
+    renderPreview();
+  };
+});
 
 function renderActivities() {
   const panel = $('activitiesPanel');
@@ -1402,44 +1505,74 @@ function renderDashboard() {
       const realIdx = sessions.length - 1 - i;
       const cls = s.workout === 'A' ? 'type-A' : 'type-B';
       const dayIdx = new Date(s.date + 'T00:00:00').getDay();
-      const exDetail = (s.exercises || []).map(e => {
+      const exs = s.exercises || [];
+      const exCells = [];
+      const weightCells = [];
+      const repsCells = [];
+      for (let k = 0; k < 5; k++) {
+        const e = exs[k];
+        if (!e) {
+          exCells.push('—'); weightCells.push('—'); repsCells.push('—');
+          continue;
+        }
         const validSets = (e.sets || []).filter(x => x.weight || x.reps);
-        if (!validSets.length) return null;
-        const setsStr = validSets.map(st => `${st.weight||'-'}×${st.reps||'-'}`).join(' · ');
-        return `${e.name}: ${setsStr}`;
-      }).filter(Boolean).join(' | ') || '—';
+        exCells.push(escapeHtml(e.name));
+        if (!validSets.length) {
+          weightCells.push('—'); repsCells.push('—');
+        } else {
+          const weights = validSets.map(st => st.weight || '-').join('/');
+          const reps = validSets.map(st => st.reps || '-').join('/');
+          weightCells.push(`${weights} kg`);
+          repsCells.push(`${validSets.length}×(${reps})`);
+        }
+      }
       const acts = s.activities || [];
       const doneActs = acts.filter(a => a.done);
       const actSummary = acts.length
-        ? `${doneActs.length}/${acts.length} · ${acts.map(a => (a.done?'✓ ':'○ ') + a.text).join(' / ')}`
+        ? acts.map(a => (a.done?'✓':'○') + ' ' + a.text).join(' / ')
         : '—';
+      const actCount = acts.length ? `${doneActs.length}/${acts.length}` : '—';
       return `
         <tr>
           <td data-label="التاريخ">
-            <div style="font-weight:700;font-size:0.82rem">${formatShortDate(s.date)}</div>
+            <div style="font-weight:700;font-size:0.8rem">${formatShortDate(s.date)}</div>
             <div style="font-size:0.7rem;color:var(--text-muted)">${DAYS[dayIdx]}</div>
           </td>
-          <td data-label="التمرين"><span class="badge ${cls}">W ${s.workout}</span></td>
-          <td data-label="تفاصيل التمارين" class="cell-ltr">${escapeHtml(exDetail)}</td>
-          <td data-label="الأنشطة">${escapeHtml(actSummary)}</td>
+          <td data-label="النوع"><span class="badge ${cls}">W ${s.workout}</span></td>
+          <td data-label="تمرين 1" class="cell-ltr">${exCells[0]}</td>
+          <td data-label="تمرين 2" class="cell-ltr">${exCells[1]}</td>
+          <td data-label="تمرين 3" class="cell-ltr">${exCells[2]}</td>
+          <td data-label="تمرين 4" class="cell-ltr">${exCells[3]}</td>
+          <td data-label="تمرين 5" class="cell-ltr">${exCells[4]}</td>
+          <td data-label="الوزن" class="cell-ltr cell-mono">${weightCells.join('<br>')}</td>
+          <td data-label="المجموعات × التكرار" class="cell-ltr cell-mono">${repsCells.join('<br>')}</td>
+          <td data-label="الأنشطة"><strong>${actCount}</strong><br><small style="color:var(--text-muted)">${escapeHtml(actSummary)}</small></td>
           <td data-label="" class="cell-action"><button class="btn-danger btn-sm" data-del-session="${realIdx}" aria-label="حذف">✕</button></td>
         </tr>
-        ${s.notes ? `<tr class="note-row"><td colspan="5" style="font-size:0.75rem;color:var(--text-muted);font-style:italic;padding:4px 10px">📝 ${escapeHtml(s.notes)}</td></tr>` : ''}
+        ${s.notes ? `<tr class="note-row"><td colspan="11" style="font-size:0.75rem;color:var(--text-muted);font-style:italic;padding:4px 10px">📝 ${escapeHtml(s.notes)}</td></tr>` : ''}
       `;
     }).join('');
     hist.innerHTML = `
+      <div style="overflow-x:auto">
       <table class="history-table">
         <thead>
           <tr>
             <th>التاريخ</th>
             <th>النوع</th>
-            <th>تفاصيل التمارين</th>
+            <th>تمرين 1</th>
+            <th>تمرين 2</th>
+            <th>تمرين 3</th>
+            <th>تمرين 4</th>
+            <th>تمرين 5</th>
+            <th>الوزن</th>
+            <th>المجموعات × التكرار</th>
             <th>الأنشطة</th>
             <th></th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
       </table>
+      </div>
     `;
     hist.querySelectorAll('[data-del-session]').forEach(b => {
       b.onclick = () => {
