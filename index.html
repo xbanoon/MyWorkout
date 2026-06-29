@@ -112,6 +112,17 @@
   }
   .panel.active { display: block; }
 
+  /* Week nav */
+  .week-nav {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+    padding: 8px 12px;
+    background: var(--shade-1);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
   /* Week grid */
   .week-grid {
     display: grid;
@@ -466,7 +477,7 @@
   }
 
   .history-list {
-    max-height: 360px;
+    max-height: 500px;
     overflow-y: auto;
     border: 1px solid var(--border);
     border-radius: 8px;
@@ -557,7 +568,12 @@
       <span>📱 ثبّت التطبيق على جهازك للوصول السريع وبدون إنترنت</span>
       <button class="btn-sm" id="installBtn">تثبيت</button>
     </div>
-    <h2 class="section-title">الجدول الأسبوعي</h2>
+    <div class="week-nav">
+      <button class="btn-ghost btn-sm" id="prevWeek" aria-label="الأسبوع السابق">▶ السابق</button>
+      <div id="weekLabel" style="font-weight:700;color:var(--accent);text-align:center;flex:1"></div>
+      <button class="btn-ghost btn-sm" id="nextWeek" aria-label="الأسبوع التالي">التالي ◀</button>
+    </div>
+    <div style="text-align:center;margin-bottom:10px"><button class="btn-ghost btn-sm" id="todayBtn">📍 اليوم</button></div>
     <div class="week-grid" id="weekGrid"></div>
     <p style="color:var(--text-muted);font-size:0.82rem;line-height:1.6">
       💡 اضغط <strong>نوع اليوم</strong> لتبديله (A / B / راحة) · <strong>اسم اليوم</strong> لفتح التمرين · <strong>أي مكان آخر</strong> لإدارة الأنشطة.
@@ -684,8 +700,26 @@ function defaultState() {
     theme: 'light',
     activities: JSON.parse(JSON.stringify(DEFAULT_DAY_ACTIVITIES)),
     activityPresets: [...DEFAULT_ACTIVITY_PRESETS],
-    selectedDay: new Date().getDay()
+    selectedDay: new Date().getDay(),
+    dayPlans: {},        // {"2026-06-29": {type, activities:[{text,done}]}}
+    viewWeekStart: weekStartFor(new Date()),
+    selectedDate: todayStrPlain()
   };
+}
+
+function todayStrPlain() {
+  const d = new Date();
+  return d.toISOString().split('T')[0];
+}
+function weekStartFor(d) {
+  const x = new Date(d);
+  x.setDate(d.getDate() - d.getDay()); // Sun
+  return x.toISOString().split('T')[0];
+}
+function addDays(isoDate, n) {
+  const d = new Date(isoDate + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return d.toISOString().split('T')[0];
 }
 
 let state;
@@ -696,7 +730,25 @@ try {
   if (!state.activities) state.activities = JSON.parse(JSON.stringify(DEFAULT_DAY_ACTIVITIES));
   if (!state.activityPresets) state.activityPresets = [...DEFAULT_ACTIVITY_PRESETS];
   if (state.selectedDay == null) state.selectedDay = new Date().getDay();
+  if (!state.dayPlans) state.dayPlans = {};
+  if (!state.viewWeekStart) state.viewWeekStart = weekStartFor(new Date());
+  if (!state.selectedDate) state.selectedDate = todayStrPlain();
 } catch { state = defaultState(); }
+
+// Get plan for a specific date (creates from template if missing in store)
+function getPlanForDate(isoDate) {
+  if (state.dayPlans[isoDate]) return state.dayPlans[isoDate];
+  const d = new Date(isoDate + 'T00:00:00');
+  const k = DAY_KEYS[d.getDay()];
+  return {
+    type: state.schedule[k] || 'rest',
+    activities: (state.activities[k] || []).map(a => ({ text: a.text, done: false }))
+  };
+}
+function ensurePlan(isoDate) {
+  if (!state.dayPlans[isoDate]) state.dayPlans[isoDate] = getPlanForDate(isoDate);
+  return state.dayPlans[isoDate];
+}
 
 function save() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
@@ -746,22 +798,28 @@ document.querySelectorAll('.tab').forEach(t => {
 function renderSchedule() {
   const grid = $('weekGrid');
   grid.innerHTML = '';
-  const todayIdx = new Date().getDay();
-  DAY_KEYS.forEach((k, i) => {
-    const type = state.schedule[k];
+  const todayStr = todayStrPlain();
+  // Week label
+  const weekEnd = addDays(state.viewWeekStart, 6);
+  $('weekLabel').textContent = `${formatArabicDate(state.viewWeekStart)} — ${formatArabicDate(weekEnd)}`;
+
+  for (let i = 0; i < 7; i++) {
+    const dateStr = addDays(state.viewWeekStart, i);
+    const plan = getPlanForDate(dateStr);
+    const type = plan.type;
+    const acts = plan.activities;
+    const isToday = dateStr === todayStr;
+    const isSelected = state.selectedDate === dateStr;
     const card = document.createElement('div');
-    const isSelected = state.selectedDay === i;
-    card.className = 'day-card' + (i === todayIdx ? ' today' : '') + (isSelected ? ' selected' : '');
+    card.className = 'day-card' + (isToday ? ' today' : '') + (isSelected ? ' selected' : '');
     const typeClass = type === 'A' ? 'type-A' : type === 'B' ? 'type-B' : 'type-rest';
     const typeLabel = type === 'rest' ? 'راحة' : 'Workout ' + type;
-    const dateStr = getDateForDay(i);
     const done = state.sessions.some(s => s.date === dateStr);
-    const dayActs = state.activities[k] || [];
-    const actCount = dayActs.length;
-    const actDone = dayActs.filter(a => a.done).length;
+    const actCount = acts.length;
+    const actDone = acts.filter(a => a.done).length;
     const actsHtml = actCount ? `
       <div class="day-activities">
-        ${dayActs.map(a => `<span class="act ${a.done ? 'done' : ''}" title="${escapeHtml(a.text)}">${a.done ? '✓ ' : '• '}${escapeHtml(a.text)}</span>`).join('')}
+        ${acts.map(a => `<span class="act ${a.done ? 'done' : ''}" title="${escapeHtml(a.text)}">${a.done ? '✓ ' : '• '}${escapeHtml(a.text)}</span>`).join('')}
         <div style="font-size:0.65rem;margin-top:3px;font-weight:600">${actDone}/${actCount}</div>
       </div>` : '';
     card.innerHTML = `
@@ -772,44 +830,62 @@ function renderSchedule() {
       ${actsHtml}
     `;
     card.onclick = (e) => {
-      // Don't override children's specific click
       if (e.target.closest('.day-type') || e.target.closest('.day-name')) return;
+      state.selectedDate = dateStr;
       state.selectedDay = i;
       save(); renderSchedule();
     };
     card.querySelector('.day-type').onclick = (e) => {
       e.stopPropagation();
       const order = ['A','B','rest'];
-      state.schedule[k] = order[(order.indexOf(type)+1) % 3];
+      const plan2 = ensurePlan(dateStr);
+      plan2.type = order[(order.indexOf(plan2.type)+1) % 3];
+      state.selectedDate = dateStr;
+      state.selectedDay = i;
       save(); renderSchedule();
     };
     card.querySelector('.day-name').onclick = (e) => {
       e.stopPropagation();
+      state.selectedDate = dateStr;
       state.selectedDay = i;
-      if (type !== 'rest') {
-        state.currentWorkout = type;
-        document.querySelector('.tab[data-tab="workout"]').click();
-      } else {
-        save(); renderSchedule();
-      }
+      save(); renderSchedule();
     };
     grid.appendChild(card);
-  });
+  }
   renderActivities();
 }
 
+$('prevWeek').onclick = () => {
+  state.viewWeekStart = addDays(state.viewWeekStart, -7);
+  save(); renderSchedule();
+};
+$('nextWeek').onclick = () => {
+  state.viewWeekStart = addDays(state.viewWeekStart, 7);
+  save(); renderSchedule();
+};
+$('todayBtn').onclick = () => {
+  state.viewWeekStart = weekStartFor(new Date());
+  state.selectedDate = todayStrPlain();
+  state.selectedDay = new Date().getDay();
+  save(); renderSchedule();
+};
+
 function renderActivities() {
   const panel = $('activitiesPanel');
-  const i = state.selectedDay;
-  const k = DAY_KEYS[i];
-  const acts = state.activities[k] || (state.activities[k] = []);
+  const dateStr = state.selectedDate;
+  const plan = ensurePlan(dateStr);
+  const acts = plan.activities;
   const presets = state.activityPresets;
-  const dateStr = getDateForDay(i);
-  const type = state.schedule[k];
+  const dayIdx = new Date(dateStr + 'T00:00:00').getDay();
+  const type = plan.type;
+  const typeOptions = ['A','B','rest'].map(t => `<option value="${t}" ${type===t?'selected':''}>${t==='rest'?'راحة':'Workout '+t}</option>`).join('');
   const workoutLabel = type === 'rest' ? 'يوم راحة' : `Workout ${type}`;
   panel.innerHTML = `
-    <h3>📋 ${DAYS[i]} — ${formatArabicDate(dateStr)}</h3>
-    <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:10px">${workoutLabel}</div>
+    <h3>📋 ${DAYS[dayIdx]} — ${formatArabicDate(dateStr)}</h3>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+      <label style="font-size:0.85rem;color:var(--text-muted)">نوع التمرين:</label>
+      <select id="typeSelect" style="flex:1;min-width:140px">${typeOptions}</select>
+    </div>
     ${acts.length === 0 ? '<div style="color:var(--text-muted);font-size:0.85rem;text-align:center;padding:10px">لا توجد أنشطة لهذا اليوم — أضف من القائمة بالأسفل</div>' : ''}
     ${acts.map((a, idx) => `
       <div class="activity-row ${a.done ? 'done' : ''}">
@@ -826,7 +902,14 @@ function renderActivities() {
       <button id="addPresetBtn">إضافة</button>
       <button id="addCustomBtn" class="btn-ghost">+ مخصص</button>
     </div>
+    <div class="actions" style="margin-top:14px">
+      <button class="btn-success" id="saveContinueBtn" style="flex:1">💾 حفظ ومتابعة → ${type==='rest'?'الجدول':'التمرين'}</button>
+    </div>
   `;
+  $('typeSelect').onchange = (e) => {
+    plan.type = e.target.value;
+    save(); renderSchedule();
+  };
   panel.querySelectorAll('[data-act-toggle]').forEach(cb => {
     cb.onchange = () => { acts[+cb.dataset.actToggle].done = cb.checked; save(); renderSchedule(); };
   });
@@ -849,6 +932,15 @@ function renderActivities() {
     acts.push({ text: trimmed, done: false });
     if (!state.activityPresets.includes(trimmed)) state.activityPresets.push(trimmed);
     save(); renderSchedule();
+  };
+  $('saveContinueBtn').onclick = () => {
+    save();
+    toast('✅ تم الحفظ', 'success');
+    if (plan.type !== 'rest') {
+      state.currentWorkout = plan.type;
+      save();
+      document.querySelector('.tab[data-tab="workout"]').click();
+    }
   };
 }
 
@@ -919,8 +1011,9 @@ function getDraft(workoutKey) {
 function renderWorkout() {
   const w = state.currentWorkout;
   $('workoutSelect').value = w;
-  const selDate = getDateForDay(state.selectedDay);
-  $('workoutTitle').innerHTML = `Workout ${w} <small style="font-size:0.75rem;opacity:0.9;display:block;font-weight:400;margin-top:2px">${DAYS[state.selectedDay]} · ${formatArabicDate(selDate)}</small>`;
+  const selDate = state.selectedDate || todayStrPlain();
+  const selDayIdx = new Date(selDate + 'T00:00:00').getDay();
+  $('workoutTitle').innerHTML = `Workout ${w} <small style="font-size:0.75rem;opacity:0.9;display:block;font-weight:400;margin-top:2px">${DAYS[selDayIdx]} · ${formatArabicDate(selDate)}</small>`;
   const list = $('exerciseList');
   list.innerHTML = '';
   const draft = getDraft(w);
@@ -1046,7 +1139,8 @@ $('completeSession').onclick = () => {
   if (!hasData) {
     if (!confirm('لا توجد مجموعات مسجلة. هل تريد حفظ الجلسة فارغة؟')) return;
   }
-  const sessionDate = getDateForDay(state.selectedDay) || todayStr();
+  const sessionDate = state.selectedDate || todayStr();
+  const planSnap = state.dayPlans[sessionDate];
   const session = {
     date: sessionDate,
     workout: w,
@@ -1055,9 +1149,13 @@ $('completeSession').onclick = () => {
       reps: ex.reps,
       sets: draft.exercises[i].sets.map(s => ({weight: s.weight, reps: s.reps}))
     })),
+    activities: planSnap ? planSnap.activities.map(a => ({text: a.text, done: a.done})) : [],
     notes: draft.notes || ''
   };
-  state.sessions.push(session);
+  // Replace existing session for that date if any (so re-saving updates)
+  const existingIdx = state.sessions.findIndex(s => s.date === sessionDate);
+  if (existingIdx >= 0) state.sessions[existingIdx] = session;
+  else state.sessions.push(session);
   state.draft[w] = null;
   save();
   toast('✅ تم حفظ جلسة ' + formatArabicDate(session.date), 'success');
@@ -1207,14 +1305,31 @@ function renderDashboard() {
     hist.innerHTML = sessions.slice().reverse().map((s, i) => {
       const realIdx = sessions.length - 1 - i;
       const cls = s.workout === 'A' ? 'type-A' : 'type-B';
+      const exLines = (s.exercises || []).map(e => {
+        const validSets = (e.sets || []).filter(x => x.weight || x.reps);
+        if (!validSets.length) return null;
+        const setsStr = validSets.map(st => `${st.weight||'-'}kg×${st.reps||'-'}`).join(' · ');
+        return `<div style="direction:ltr;text-align:left;font-size:0.78rem;padding:2px 0"><strong>${escapeHtml(e.name)}:</strong> ${setsStr}</div>`;
+      }).filter(Boolean).join('');
       const totalSets = (s.exercises || []).reduce((sum, e) => sum + (e.sets ? e.sets.filter(x => x.weight || x.reps).length : 0), 0);
+      const acts = s.activities || [];
+      const doneActs = acts.filter(a => a.done);
+      const actsHtml = acts.length ? `
+        <div style="margin-top:6px;padding-top:6px;border-top:1px dashed var(--border);font-size:0.78rem">
+          <strong style="color:var(--text-muted)">الأنشطة (${doneActs.length}/${acts.length}):</strong>
+          ${acts.map(a => `<span class="badge" style="background:${a.done?'var(--accent)':'var(--shade-3)'};color:${a.done?'var(--surface)':'var(--text-muted)'};margin:2px 4px 2px 0">${a.done?'✓':'○'} ${escapeHtml(a.text)}</span>`).join('')}
+        </div>` : '';
+      const dayIdx = new Date(s.date + 'T00:00:00').getDay();
       return `
-        <div class="history-item">
-          <div style="flex:1;min-width:0">
-            <div><span class="badge ${cls}">W ${s.workout}</span><strong>${formatArabicDate(s.date)}</strong> <small style="color:var(--text-muted)">— ${totalSets} مجموعات</small></div>
-            ${s.notes ? `<div style="font-size:0.78rem;color:var(--text-muted);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(s.notes)}</div>` : ''}
+        <div class="history-item" style="flex-direction:column;align-items:stretch;gap:0">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+            <div><span class="badge ${cls}">W ${s.workout}</span><strong>${DAYS[dayIdx]} · ${formatArabicDate(s.date)}</strong></div>
+            <button class="btn-danger btn-sm" data-del-session="${realIdx}" aria-label="حذف">✕</button>
           </div>
-          <button class="btn-danger btn-sm" data-del-session="${realIdx}" aria-label="حذف">✕</button>
+          <div style="color:var(--text-muted);font-size:0.78rem;margin-top:2px">${totalSets} مجموعات منجزة</div>
+          ${exLines ? `<div style="margin-top:6px;padding-top:6px;border-top:1px dashed var(--border)">${exLines}</div>` : ''}
+          ${actsHtml}
+          ${s.notes ? `<div style="font-size:0.78rem;color:var(--text-muted);margin-top:6px;padding-top:6px;border-top:1px dashed var(--border);font-style:italic">📝 ${escapeHtml(s.notes)}</div>` : ''}
         </div>
       `;
     }).join('');
