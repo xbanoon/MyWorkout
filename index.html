@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>تماريني - المرحلة الأولى</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+    background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+    min-height: 100vh;
+    color: #222;
+    padding: 16px;
+  }
+  .container { max-width: 1100px; margin: 0 auto; }
+  header {
+    background: #b91c1c;
+    color: #fff;
+    padding: 14px 20px;
+    border-radius: 10px 10px 0 0;
+    text-align: center;
+    font-weight: bold;
+    font-size: 1.2rem;
+  }
+  .tabs {
+    display: flex;
+    background: #1e3a8a;
+    border-bottom: 3px solid #fff;
+  }
+  .tab {
+    flex: 1;
+    padding: 14px;
+    text-align: center;
+    color: #cbd5e1;
+    cursor: pointer;
+    font-weight: bold;
+    transition: all 0.2s;
+    border-left: 1px solid #334155;
+  }
+  .tab:last-child { border-left: none; }
+  .tab.active { background: #fff; color: #1e3a8a; }
+  .tab:hover:not(.active) { background: #1e40af; color: #fff; }
+  .panel {
+    background: #fff;
+    padding: 20px;
+    border-radius: 0 0 10px 10px;
+    display: none;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  }
+  .panel.active { display: block; }
+
+  /* Week schedule */
+  .week-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 6px;
+    margin-bottom: 20px;
+  }
+  .day-card {
+    background: #e0e7ff;
+    border-radius: 8px;
+    padding: 10px 6px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 2px solid transparent;
+  }
+  .day-card:hover { transform: translateY(-2px); }
+  .day-card.selected { border-color: #1e3a8a; background: #c7d2fe; }
+  .day-name { font-weight: bold; color: #1e3a8a; font-size: 0.85rem; }
+  .day-type {
+    margin-top: 6px;
+    padding: 4px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: bold;
+  }
+  .type-A { background: #16a34a; color: #fff; }
+  .type-B { background: #2563eb; color: #fff; }
+  .type-rest { background: #94a3b8; color: #fff; }
+  .day-status {
+    margin-top: 6px;
+    font-size: 1.2rem;
+  }
+
+  /* Workout table */
+  .workout-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+    padding: 12px;
+    background: #1e3a8a;
+    color: #fff;
+    border-radius: 8px;
+  }
+  .workout-header h2 { font-size: 1.2rem; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 16px;
+  }
+  th {
+    background: #111827;
+    color: #fff;
+    padding: 10px;
+    text-align: right;
+    font-size: 0.9rem;
+  }
+  td {
+    padding: 8px;
+    border-bottom: 1px solid #e5e7eb;
+    vertical-align: top;
+    font-size: 0.9rem;
+  }
+  tr:nth-child(even) td { background: #f9fafb; }
+  .ex-name {
+    font-weight: bold;
+    direction: ltr;
+    text-align: left;
+    color: #1e3a8a;
+  }
+  input[type="number"], input[type="text"], textarea {
+    width: 100%;
+    padding: 6px;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 0.85rem;
+  }
+  textarea { resize: vertical; min-height: 40px; }
+  .small-input { width: 70px; }
+  button {
+    background: #1e3a8a;
+    color: #fff;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+    font-family: inherit;
+    transition: background 0.2s;
+  }
+  button:hover { background: #1e40af; }
+  .btn-success { background: #16a34a; }
+  .btn-success:hover { background: #15803d; }
+  .btn-danger { background: #dc2626; }
+  .btn-danger:hover { background: #b91c1c; }
+  .btn-sm { padding: 4px 10px; font-size: 0.8rem; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+
+  /* Dashboard */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+  .stat-card {
+    background: linear-gradient(135deg, #1e3a8a, #3b82f6);
+    color: #fff;
+    padding: 18px;
+    border-radius: 10px;
+    text-align: center;
+  }
+  .stat-value { font-size: 2rem; font-weight: bold; }
+  .stat-label { font-size: 0.85rem; opacity: 0.9; margin-top: 6px; }
+
+  .progress-bar {
+    background: #e5e7eb;
+    border-radius: 10px;
+    height: 24px;
+    overflow: hidden;
+    margin: 10px 0;
+  }
+  .progress-fill {
+    background: linear-gradient(90deg, #16a34a, #22c55e);
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-weight: bold;
+    font-size: 0.85rem;
+    transition: width 0.4s;
+  }
+
+  .history-list {
+    max-height: 320px;
+    overflow-y: auto;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+  }
+  .history-item {
+    padding: 10px 14px;
+    border-bottom: 1px solid #f1f5f9;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .history-item:last-child { border-bottom: none; }
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: bold;
+  }
+
+  .section-title {
+    font-size: 1.1rem;
+    color: #1e3a8a;
+    margin: 20px 0 10px;
+    padding-bottom: 6px;
+    border-bottom: 2px solid #1e3a8a;
+  }
+
+  .note-row { background: #fef3c7 !important; }
+  .note-row td { padding: 6px 8px; }
+
+  @media (max-width: 768px) {
+    .week-grid { grid-template-columns: repeat(4, 1fr); }
+    table, thead, tbody, th, td, tr { display: block; }
+    thead { display: none; }
+    tr { margin-bottom: 12px; border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px; }
+    td { border: none; padding: 6px; }
+    td::before {
+      content: attr(data-label);
+      font-weight: bold;
+      color: #1e3a8a;
+      display: block;
+      margin-bottom: 4px;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>جدول تماريني الأسبوعي — المرحلة الأولى (لخسارة الدهون 4–5 أشهر)</header>
+  <div class="tabs">
+    <div class="tab active" data-tab="schedule">📅 الجدول الأسبوعي</div>
+    <div class="tab" data-tab="workout">🏋️ التمرين</div>
+    <div class="tab" data-tab="dashboard">📊 لوحة البيانات</div>
+  </div>
+
+  <!-- Schedule -->
+  <div class="panel active" id="schedule">
+    <h2 class="section-title">اختر اليوم لعرض/تعديل تمرينه</h2>
+    <div class="week-grid" id="weekGrid"></div>
+    <p style="color:#475569;font-size:0.9rem">💡 اضغط على نوع اليوم لتغييره (A / B / راحة). اضغط على اسم اليوم للذهاب إلى التمرين.</p>
+  </div>
+
+  <!-- Workout -->
+  <div class="panel" id="workout">
+    <div class="workout-header">
+      <h2 id="workoutTitle">Workout A</h2>
+      <div>
+        <select id="workoutSelect" style="padding:6px;border-radius:6px">
+          <option value="A">Workout A</option>
+          <option value="B">Workout B</option>
+        </select>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>التمرين (Exercise)</th>
+          <th>المجموعات</th>
+          <th>التكرارات</th>
+          <th>الراحة (دقيقة)</th>
+          <th>الوزن (كجم)</th>
+          <th>ملاحظات / الأداء</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="exerciseBody"></tbody>
+    </table>
+
+    <div class="actions">
+      <button id="addExercise">➕ إضافة تمرين</button>
+      <button class="btn-success" id="completeSession">✅ تسجيل جلسة اليوم كمكتملة</button>
+      <button class="btn-danger" id="resetDefaults">🔄 استعادة التمارين الافتراضية</button>
+    </div>
+
+    <h3 class="section-title">📝 ملاحظات الجلسة</h3>
+    <textarea id="sessionNotes" placeholder="اكتب ملاحظات اليوم: كيف شعرت، الإنجازات، الإصابات..."></textarea>
+  </div>
+
+  <!-- Dashboard -->
+  <div class="panel" id="dashboard">
+    <h2 class="section-title">إحصاءات الأسبوع الحالي</h2>
+    <div class="stats-grid" id="statsGrid"></div>
+
+    <h2 class="section-title">📈 نسبة الالتزام (آخر 4 أسابيع)</h2>
+    <div id="weeklyProgress"></div>
+
+    <h2 class="section-title">🗓️ سجل الجلسات</h2>
+    <div class="history-list" id="historyList"></div>
+
+    <div class="actions" style="margin-top:16px">
+      <button id="exportData">📥 تصدير البيانات (JSON)</button>
+      <button id="importData">📤 استيراد البيانات</button>
+      <button class="btn-danger" id="clearAll">🗑️ مسح كل البيانات</button>
+    </div>
+    <input type="file" id="importFile" accept="application/json" style="display:none">
+  </div>
+</div>
+
+<script>
+const DAYS = ['الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت','الأحد'];
+const DAY_KEYS = ['mon','tue','wed','thu','fri','sat','sun'];
+
+const DEFAULT_A = [
+  { name: 'Barbell Bench Press', sets: 3, reps: '8-10', rest: '2.5-3', notes: 'Try pinky on rings, keep shoulder-blades retracted, maintain lower back arch.' },
+  { name: 'Back Squat', sets: 4, reps: '8-10', rest: '3', notes: 'Experiment with foot stance, toes slightly out, straight back, squat to parallel.' },
+  { name: 'Chest-Supported Row', sets: 3, reps: '8-10', rest: '2', notes: 'Pull with elbows, squeeze shoulder-blades, don\'t flare elbows.' },
+  { name: 'Dumbbell Lateral Raises', sets: 3, reps: '10-15', rest: '~45-60s', notes: 'Lean torso forward, retract shoulderblades, externally rotate shoulder.' },
+  { name: 'Single Leg Weighted Calf Raise', sets: 4, reps: '6-10', rest: '1-1.5', notes: 'Pause at bottom, full range of motion.' }
+];
+
+const DEFAULT_B = [
+  { name: 'Incline Dumbbell Press', sets: 3, reps: '10-12', rest: '2-3', notes: 'Bench ~15-45°, shoulder blades retracted, chest out, don\'t flare elbows.' },
+  { name: 'Deadlift', sets: 3, reps: '6-8', rest: '3', notes: 'Straight back, head/back/hips inline.' },
+  { name: 'Standing Overhead Press', sets: 3, reps: '8-10', rest: '2-3', notes: 'Press straight up, core engaged, no momentum, don\'t arch lower back.' },
+  { name: 'Pull-Ups', sets: 3, reps: '8-10', rest: '2-3', notes: 'Wider than shoulder-width thumbless grip, pull with elbows, full ROM. (Swap for lat-pulldowns if needed)' },
+  { name: 'Kneeling Face Pulls', sets: 4, reps: '10-15', rest: '1.5-2', notes: 'Upper traps relaxed, pull to face, fists toward ceiling (external rotation).' }
+];
+
+const DEFAULT_SCHEDULE = {
+  mon: 'B', tue: 'rest', wed: 'A', thu: 'rest', fri: 'rest', sat: 'A', sun: 'rest'
+};
+
+// State
+let state = JSON.parse(localStorage.getItem('phase1_state') || 'null') || {
+  schedule: {...DEFAULT_SCHEDULE},
+  workouts: { A: JSON.parse(JSON.stringify(DEFAULT_A)), B: JSON.parse(JSON.stringify(DEFAULT_B)) },
+  sessions: [], // {date, day, workout, exercises:[{name,weight,actualReps,notes}], notes}
+  currentWorkout: 'A',
+  sessionDraft: {}
+};
+
+function save() { localStorage.setItem('phase1_state', JSON.stringify(state)); }
+
+// Tabs
+document.querySelectorAll('.tab').forEach(t => {
+  t.onclick = () => {
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById(t.dataset.tab).classList.add('active');
+    if (t.dataset.tab === 'dashboard') renderDashboard();
+    if (t.dataset.tab === 'workout') renderWorkout();
+    if (t.dataset.tab === 'schedule') renderSchedule();
+  };
+});
+
+// Schedule
+function renderSchedule() {
+  const grid = document.getElementById('weekGrid');
+  grid.innerHTML = '';
+  DAY_KEYS.forEach((k,i) => {
+    const type = state.schedule[k];
+    const card = document.createElement('div');
+    card.className = 'day-card';
+    const typeClass = type === 'A' ? 'type-A' : type === 'B' ? 'type-B' : 'type-rest';
+    const typeLabel = type === 'rest' ? 'راحة' : 'Workout ' + type;
+    const todayDate = getDateForDay(i);
+    const done = state.sessions.some(s => s.date === todayDate);
+    card.innerHTML = `
+      <div class="day-name">${DAYS[i]}</div>
+      <div class="day-type ${typeClass}">${typeLabel}</div>
+      <div class="day-status">${done ? '✅' : (type==='rest'?'😴':'⏳')}</div>
+    `;
+    card.querySelector('.day-type').onclick = (e) => {
+      e.stopPropagation();
+      const order = ['A','B','rest'];
+      const next = order[(order.indexOf(type)+1) % 3];
+      state.schedule[k] = next;
+      save(); renderSchedule();
+    };
+    card.querySelector('.day-name').onclick = () => {
+      if (type !== 'rest') {
+        state.currentWorkout = type;
+        document.querySelector('.tab[data-tab="workout"]').click();
+      }
+    };
+    grid.appendChild(card);
+  });
+}
+
+function getDateForDay(dayIdx) {
+  const now = new Date();
+  const cur = (now.getDay()+6) % 7; // Mon=0
+  const diff = dayIdx - cur;
+  const d = new Date(now); d.setDate(now.getDate()+diff);
+  return d.toISOString().split('T')[0];
+}
+
+// Workout
+document.getElementById('workoutSelect').onchange = (e) => {
+  state.currentWorkout = e.target.value;
+  renderWorkout();
+};
+
+function renderWorkout() {
+  const w = state.currentWorkout;
+  document.getElementById('workoutSelect').value = w;
+  document.getElementById('workoutTitle').textContent = 'Workout ' + w;
+  const body = document.getElementById('exerciseBody');
+  body.innerHTML = '';
+  state.workouts[w].forEach((ex, idx) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td data-label="التمرين"><input type="text" class="ex-name" value="${escapeHtml(ex.name)}" data-field="name" data-idx="${idx}"></td>
+      <td data-label="المجموعات"><input type="number" class="small-input" value="${ex.sets}" data-field="sets" data-idx="${idx}"></td>
+      <td data-label="التكرارات"><input type="text" class="small-input" value="${escapeHtml(ex.reps)}" data-field="reps" data-idx="${idx}"></td>
+      <td data-label="الراحة"><input type="text" class="small-input" value="${escapeHtml(ex.rest)}" data-field="rest" data-idx="${idx}"></td>
+      <td data-label="الوزن"><input type="text" class="small-input" value="${escapeHtml(ex.weight||'')}" data-field="weight" data-idx="${idx}" placeholder="-"></td>
+      <td data-label="ملاحظات"><textarea data-field="notes" data-idx="${idx}">${escapeHtml(ex.notes||'')}</textarea></td>
+      <td><button class="btn-danger btn-sm" data-del="${idx}">حذف</button></td>
+    `;
+    body.appendChild(tr);
+  });
+
+  body.querySelectorAll('input,textarea').forEach(inp => {
+    inp.oninput = () => {
+      const i = +inp.dataset.idx;
+      state.workouts[w][i][inp.dataset.field] = inp.value;
+      save();
+    };
+  });
+  body.querySelectorAll('[data-del]').forEach(btn => {
+    btn.onclick = () => {
+      if (confirm('حذف هذا التمرين؟')) {
+        state.workouts[w].splice(+btn.dataset.del, 1);
+        save(); renderWorkout();
+      }
+    };
+  });
+
+  document.getElementById('sessionNotes').value = state.sessionDraft[w] || '';
+}
+
+document.getElementById('sessionNotes').oninput = (e) => {
+  state.sessionDraft[state.currentWorkout] = e.target.value;
+  save();
+};
+
+document.getElementById('addExercise').onclick = () => {
+  const name = prompt('اسم التمرين الجديد (English):');
+  if (!name) return;
+  state.workouts[state.currentWorkout].push({ name, sets:3, reps:'8-10', rest:'2', notes:'', weight:'' });
+  save(); renderWorkout();
+};
+
+document.getElementById('resetDefaults').onclick = () => {
+  if (!confirm('استعادة التمارين الافتراضية لهذا البرنامج؟')) return;
+  const w = state.currentWorkout;
+  state.workouts[w] = JSON.parse(JSON.stringify(w==='A'?DEFAULT_A:DEFAULT_B));
+  save(); renderWorkout();
+};
+
+document.getElementById('completeSession').onclick = () => {
+  const today = new Date().toISOString().split('T')[0];
+  const w = state.currentWorkout;
+  state.sessions.push({
+    date: today,
+    workout: w,
+    exercises: JSON.parse(JSON.stringify(state.workouts[w])),
+    notes: state.sessionDraft[w] || ''
+  });
+  state.sessionDraft[w] = '';
+  save();
+  alert('✅ تم تسجيل جلسة ' + today);
+  renderWorkout();
+};
+
+// Dashboard
+function renderDashboard() {
+  const sessions = state.sessions;
+  const now = new Date();
+  const weekStart = new Date(now); weekStart.setDate(now.getDate() - ((now.getDay()+6)%7));
+  const weekStartStr = weekStart.toISOString().split('T')[0];
+
+  const thisWeek = sessions.filter(s => s.date >= weekStartStr);
+  const plannedThisWeek = Object.values(state.schedule).filter(t => t !== 'rest').length;
+  const compliance = plannedThisWeek ? Math.round((thisWeek.length / plannedThisWeek) * 100) : 0;
+
+  const totalSessions = sessions.length;
+  const aCount = sessions.filter(s=>s.workout==='A').length;
+  const bCount = sessions.filter(s=>s.workout==='B').length;
+
+  // streak
+  let streak = 0;
+  const dates = new Set(sessions.map(s=>s.date));
+  for (let i=0;i<365;i++) {
+    const d = new Date(now); d.setDate(now.getDate()-i);
+    const ds = d.toISOString().split('T')[0];
+    const dayIdx = (d.getDay()+6)%7;
+    const planned = state.schedule[DAY_KEYS[dayIdx]] !== 'rest';
+    if (!planned) continue;
+    if (dates.has(ds)) streak++;
+    else break;
+  }
+
+  document.getElementById('statsGrid').innerHTML = `
+    <div class="stat-card"><div class="stat-value">${thisWeek.length}/${plannedThisWeek}</div><div class="stat-label">جلسات هذا الأسبوع</div></div>
+    <div class="stat-card"><div class="stat-value">${compliance}%</div><div class="stat-label">نسبة الالتزام الأسبوعية</div></div>
+    <div class="stat-card"><div class="stat-value">${totalSessions}</div><div class="stat-label">إجمالي الجلسات</div></div>
+    <div class="stat-card"><div class="stat-value">${streak}</div><div class="stat-label">سلسلة الالتزام 🔥</div></div>
+    <div class="stat-card"><div class="stat-value">${aCount}</div><div class="stat-label">جلسات Workout A</div></div>
+    <div class="stat-card"><div class="stat-value">${bCount}</div><div class="stat-label">جلسات Workout B</div></div>
+  `;
+
+  // Weekly progress (4 weeks)
+  const wp = document.getElementById('weeklyProgress');
+  wp.innerHTML = '';
+  for (let i=3;i>=0;i--) {
+    const ws = new Date(weekStart); ws.setDate(weekStart.getDate() - i*7);
+    const we = new Date(ws); we.setDate(ws.getDate()+6);
+    const wsStr = ws.toISOString().split('T')[0];
+    const weStr = we.toISOString().split('T')[0];
+    const count = sessions.filter(s => s.date >= wsStr && s.date <= weStr).length;
+    const pct = plannedThisWeek ? Math.min(100, Math.round((count/plannedThisWeek)*100)) : 0;
+    const label = i===0 ? 'هذا الأسبوع' : `قبل ${i} أسبوع`;
+    wp.innerHTML += `
+      <div style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;font-size:0.85rem;margin-bottom:4px">
+          <span>${label} (${wsStr})</span>
+          <span>${count}/${plannedThisWeek} جلسات</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%">${pct}%</div></div>
+      </div>
+    `;
+  }
+
+  // History
+  const hist = document.getElementById('historyList');
+  if (sessions.length === 0) {
+    hist.innerHTML = '<div class="history-item"><span style="color:#94a3b8">لا توجد جلسات مسجلة بعد</span></div>';
+  } else {
+    hist.innerHTML = sessions.slice().reverse().map((s,i) => {
+      const realIdx = sessions.length - 1 - i;
+      const cls = s.workout==='A' ? 'type-A' : 'type-B';
+      return `
+        <div class="history-item">
+          <div>
+            <strong>${s.date}</strong>
+            <span class="badge ${cls}">Workout ${s.workout}</span>
+            <div style="font-size:0.8rem;color:#64748b;margin-top:4px">${escapeHtml(s.notes||'').slice(0,80)}</div>
+          </div>
+          <button class="btn-danger btn-sm" data-del-session="${realIdx}">حذف</button>
+        </div>
+      `;
+    }).join('');
+    hist.querySelectorAll('[data-del-session]').forEach(b => {
+      b.onclick = () => {
+        if (confirm('حذف هذه الجلسة من السجل؟')) {
+          state.sessions.splice(+b.dataset.delSession, 1);
+          save(); renderDashboard();
+        }
+      };
+    });
+  }
+}
+
+// Data management
+document.getElementById('exportData').onclick = () => {
+  const blob = new Blob([JSON.stringify(state, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'phase1_backup_' + new Date().toISOString().split('T')[0] + '.json';
+  a.click(); URL.revokeObjectURL(url);
+};
+document.getElementById('importData').onclick = () => document.getElementById('importFile').click();
+document.getElementById('importFile').onchange = (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      state = JSON.parse(r.result);
+      save();
+      alert('✅ تم استيراد البيانات');
+      renderSchedule(); renderDashboard();
+    } catch { alert('❌ ملف غير صالح'); }
+  };
+  r.readAsText(f);
+};
+document.getElementById('clearAll').onclick = () => {
+  if (confirm('سيتم مسح جميع البيانات نهائياً. هل أنت متأكد؟')) {
+    localStorage.removeItem('phase1_state');
+    location.reload();
+  }
+};
+
+function escapeHtml(s) {
+  return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// Init
+renderSchedule();
+renderWorkout();
+</script>
+</body>
+</html>
