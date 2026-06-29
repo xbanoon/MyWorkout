@@ -608,8 +608,12 @@
 <script>
 'use strict';
 
-const DAYS = ['الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت','الأحد'];
-const DAY_KEYS = ['mon','tue','wed','thu','fri','sat','sun'];
+const DAYS = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+const DAY_KEYS = ['sun','mon','tue','wed','thu','fri','sat'];
+const WEEKEND_KEYS = ['fri','sat'];
+
+function weekStartIdx() { return new Date().getDay(); } // Sun = 0
+function dayIdxFromDate(d) { return d.getDay(); }
 
 const DEFAULT_A = [
   { name: 'Barbell Bench Press', sets: 3, reps: '8-10', rest: 165, coach: 'Try pinky on rings, keep shoulder-blades retracted, maintain lower back arch.' },
@@ -625,7 +629,7 @@ const DEFAULT_B = [
   { name: 'Pull-Ups', sets: 3, reps: '8-10', rest: 150, coach: 'Wider than shoulder-width thumbless grip, pull with elbows, full ROM. Swap for lat-pulldowns if needed.' },
   { name: 'Kneeling Face Pulls', sets: 4, reps: '10-15', rest: 105, coach: 'Upper traps relaxed, pull to face, fists toward ceiling (external rotation).' }
 ];
-const DEFAULT_SCHEDULE = { mon:'B', tue:'rest', wed:'A', thu:'rest', fri:'rest', sat:'A', sun:'rest' };
+const DEFAULT_SCHEDULE = { sun:'A', mon:'B', tue:'rest', wed:'A', thu:'rest', fri:'rest', sat:'rest' };
 
 const STORAGE_KEY = 'phase1_state_v2';
 
@@ -640,6 +644,7 @@ const DEFAULT_ACTIVITY_PRESETS = [
 ];
 
 const DEFAULT_DAY_ACTIVITIES = {
+  sun: [{ text: 'PREHAB Routine (Post-workout)', done: false }],
   mon: [{ text: 'PREHAB Routine (Post-workout)', done: false }],
   tue: [{ text: 'Brisk Walking 40-60 min', done: false }],
   wed: [
@@ -648,9 +653,8 @@ const DEFAULT_DAY_ACTIVITIES = {
     { text: 'PREHAB Routine', done: false }
   ],
   thu: [{ text: 'Brisk Walking 40-60 min', done: false }],
-  fri: [{ text: 'Brisk Walking 40-60 min', done: false }],
-  sat: [{ text: 'Brisk Walking 40-60 min', done: false }],
-  sun: [{ text: 'Brisk Walking 40-60 min', done: false }]
+  fri: [{ text: 'Brisk Walking 40-60 min (عطلة)', done: false }],
+  sat: [{ text: 'Brisk Walking 40-60 min (عطلة)', done: false }]
 };
 
 function defaultState() {
@@ -663,7 +667,7 @@ function defaultState() {
     theme: 'light',
     activities: JSON.parse(JSON.stringify(DEFAULT_DAY_ACTIVITIES)),
     activityPresets: [...DEFAULT_ACTIVITY_PRESETS],
-    selectedDay: (new Date().getDay() + 6) % 7
+    selectedDay: new Date().getDay()
   };
 }
 
@@ -674,7 +678,7 @@ try {
   if (!state.workouts) state = defaultState();
   if (!state.activities) state.activities = JSON.parse(JSON.stringify(DEFAULT_DAY_ACTIVITIES));
   if (!state.activityPresets) state.activityPresets = [...DEFAULT_ACTIVITY_PRESETS];
-  if (state.selectedDay == null) state.selectedDay = (new Date().getDay() + 6) % 7;
+  if (state.selectedDay == null) state.selectedDay = new Date().getDay();
 } catch { state = defaultState(); }
 
 function save() {
@@ -725,7 +729,7 @@ document.querySelectorAll('.tab').forEach(t => {
 function renderSchedule() {
   const grid = $('weekGrid');
   grid.innerHTML = '';
-  const todayIdx = (new Date().getDay() + 6) % 7;
+  const todayIdx = new Date().getDay();
   DAY_KEYS.forEach((k, i) => {
     const type = state.schedule[k];
     const card = document.createElement('div');
@@ -739,6 +743,7 @@ function renderSchedule() {
     const actDone = (state.activities[k] || []).filter(a => a.done).length;
     card.innerHTML = `
       <div class="day-name" role="button" tabindex="0">${DAYS[i]}</div>
+      <div style="font-size:0.7rem;color:var(--text-muted);margin-top:2px">${formatShortDate(dateStr)}</div>
       <div class="day-type ${typeClass}" role="button" tabindex="0">${typeLabel}</div>
       <div class="day-status" aria-label="${done ? 'مكتمل' : 'غير مكتمل'}">${done ? '✅' : (type==='rest'?'😴':'⏳')}</div>
       ${actCount ? `<div style="font-size:0.7rem;color:var(--text-muted);margin-top:4px">${actDone}/${actCount}</div>` : ''}
@@ -776,8 +781,12 @@ function renderActivities() {
   const k = DAY_KEYS[i];
   const acts = state.activities[k] || (state.activities[k] = []);
   const presets = state.activityPresets;
+  const dateStr = getDateForDay(i);
+  const type = state.schedule[k];
+  const workoutLabel = type === 'rest' ? 'يوم راحة' : `Workout ${type}`;
   panel.innerHTML = `
-    <h3>📋 أنشطة يوم ${DAYS[i]}</h3>
+    <h3>📋 ${DAYS[i]} — ${formatArabicDate(dateStr)}</h3>
+    <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:10px">${workoutLabel}</div>
     ${acts.length === 0 ? '<div style="color:var(--text-muted);font-size:0.85rem;text-align:center;padding:10px">لا توجد أنشطة لهذا اليوم — أضف من القائمة بالأسفل</div>' : ''}
     ${acts.map((a, idx) => `
       <div class="activity-row ${a.done ? 'done' : ''}">
@@ -822,10 +831,21 @@ function renderActivities() {
 
 function getDateForDay(dayIdx) {
   const now = new Date();
-  const cur = (now.getDay() + 6) % 7;
+  const cur = now.getDay(); // Sun = 0
   const d = new Date(now);
   d.setDate(now.getDate() + (dayIdx - cur));
   return d.toISOString().split('T')[0];
+}
+function formatArabicDate(isoStr) {
+  if (!isoStr) return '';
+  const d = new Date(isoStr + 'T00:00:00');
+  const months = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+  return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+}
+function formatShortDate(isoStr) {
+  if (!isoStr) return '';
+  const d = new Date(isoStr + 'T00:00:00');
+  return `${d.getDate()}/${d.getMonth()+1}`;
 }
 
 // Find last session weight for an exercise
@@ -876,7 +896,8 @@ function getDraft(workoutKey) {
 function renderWorkout() {
   const w = state.currentWorkout;
   $('workoutSelect').value = w;
-  $('workoutTitle').textContent = 'Workout ' + w;
+  const selDate = getDateForDay(state.selectedDay);
+  $('workoutTitle').innerHTML = `Workout ${w} <small style="font-size:0.75rem;opacity:0.9;display:block;font-weight:400;margin-top:2px">${DAYS[state.selectedDay]} · ${formatArabicDate(selDate)}</small>`;
   const list = $('exerciseList');
   list.innerHTML = '';
   const draft = getDraft(w);
@@ -1002,8 +1023,9 @@ $('completeSession').onclick = () => {
   if (!hasData) {
     if (!confirm('لا توجد مجموعات مسجلة. هل تريد حفظ الجلسة فارغة؟')) return;
   }
+  const sessionDate = getDateForDay(state.selectedDay) || todayStr();
   const session = {
-    date: todayStr(),
+    date: sessionDate,
     workout: w,
     exercises: state.workouts[w].map((ex, i) => ({
       name: ex.name,
@@ -1015,7 +1037,7 @@ $('completeSession').onclick = () => {
   state.sessions.push(session);
   state.draft[w] = null;
   save();
-  toast('✅ تم حفظ جلسة ' + session.date, 'success');
+  toast('✅ تم حفظ جلسة ' + formatArabicDate(session.date), 'success');
   renderWorkout();
 };
 
@@ -1075,7 +1097,7 @@ function renderDashboard() {
   const sessions = state.sessions;
   const now = new Date();
   const weekStart = new Date(now);
-  weekStart.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+  weekStart.setDate(now.getDate() - now.getDay());
   const weekStartStr = weekStart.toISOString().split('T')[0];
 
   const thisWeek = sessions.filter(s => s.date >= weekStartStr);
@@ -1093,7 +1115,7 @@ function renderDashboard() {
     const d = new Date(now);
     d.setDate(now.getDate() - i);
     const ds = d.toISOString().split('T')[0];
-    const dayIdx = (d.getDay() + 6) % 7;
+    const dayIdx = d.getDay();
     if (state.schedule[DAY_KEYS[dayIdx]] === 'rest') continue;
     if (dateSet.has(ds)) streak++;
     else if (i > 0) break;
@@ -1121,8 +1143,8 @@ function renderDashboard() {
     const label = i === 0 ? 'هذا الأسبوع' : `قبل ${i} ${i === 1 ? 'أسبوع' : 'أسابيع'}`;
     wp.innerHTML += `
       <div style="margin-bottom:10px">
-        <div style="display:flex;justify-content:space-between;font-size:0.85rem;margin-bottom:4px">
-          <span>${label}</span>
+        <div style="display:flex;justify-content:space-between;font-size:0.85rem;margin-bottom:4px;flex-wrap:wrap;gap:6px">
+          <span><strong>${label}</strong> <small style="color:var(--text-muted)">(${formatShortDate(wsStr)} – ${formatShortDate(weStr)})</small></span>
           <span>${count}/${plannedPerWeek}</span>
         </div>
         <div class="progress-bar"><div class="progress-fill" style="width:${pct}%">${pct}%</div></div>
@@ -1166,7 +1188,7 @@ function renderDashboard() {
       return `
         <div class="history-item">
           <div style="flex:1;min-width:0">
-            <div><span class="badge ${cls}">W ${s.workout}</span><strong>${s.date}</strong> <small style="color:var(--text-muted)">— ${totalSets} مجموعات</small></div>
+            <div><span class="badge ${cls}">W ${s.workout}</span><strong>${formatArabicDate(s.date)}</strong> <small style="color:var(--text-muted)">— ${totalSets} مجموعات</small></div>
             ${s.notes ? `<div style="font-size:0.78rem;color:var(--text-muted);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(s.notes)}</div>` : ''}
           </div>
           <button class="btn-danger btn-sm" data-del-session="${realIdx}" aria-label="حذف">✕</button>
