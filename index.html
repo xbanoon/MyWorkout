@@ -483,9 +483,67 @@
 
   .history-list {
     max-height: 500px;
-    overflow-y: auto;
+    overflow: auto;
     border: 1px solid var(--border);
     border-radius: 8px;
+  }
+  .history-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+  }
+  .history-table thead {
+    background: var(--accent);
+    color: var(--surface);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+  .history-table th {
+    text-align: right;
+    padding: 8px 10px;
+    font-weight: 700;
+    font-size: 0.8rem;
+    white-space: nowrap;
+  }
+  .history-table td {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    word-break: break-word;
+  }
+  .history-table tbody tr:nth-child(odd) td { background: var(--shade-1); }
+  .history-table tbody tr.note-row td { background: var(--shade-2) !important; border-bottom: 1px solid var(--border); }
+  .history-table .cell-ltr { direction: ltr; text-align: left; font-size: 0.78rem; line-height: 1.5; }
+  .history-table .cell-action { width: 1%; white-space: nowrap; text-align: center; }
+  @media (max-width: 700px) {
+    .history-table thead { display: none; }
+    .history-table, .history-table tbody, .history-table tr, .history-table td { display: block; width: 100%; }
+    .history-table tr {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 8px;
+      padding: 6px;
+      background: var(--surface);
+    }
+    .history-table tbody tr:nth-child(odd) td { background: transparent; }
+    .history-table td {
+      border: none;
+      padding: 4px 6px;
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+    }
+    .history-table td::before {
+      content: attr(data-label);
+      font-weight: 700;
+      color: var(--text-muted);
+      min-width: 90px;
+      font-size: 0.75rem;
+    }
+    .history-table td[data-label=""]::before { display: none; }
+    .history-table td.cell-ltr { flex-direction: column; align-items: flex-end; }
+    .history-table td.cell-ltr::before { align-self: flex-start; }
   }
   .history-item {
     padding: 10px 14px;
@@ -1340,37 +1398,49 @@ function renderDashboard() {
   if (sessions.length === 0) {
     hist.innerHTML = '<div class="empty-state">لا توجد جلسات مسجلة بعد</div>';
   } else {
-    hist.innerHTML = sessions.slice().reverse().map((s, i) => {
+    const rows = sessions.slice().reverse().map((s, i) => {
       const realIdx = sessions.length - 1 - i;
       const cls = s.workout === 'A' ? 'type-A' : 'type-B';
-      const exLines = (s.exercises || []).map(e => {
+      const dayIdx = new Date(s.date + 'T00:00:00').getDay();
+      const exDetail = (s.exercises || []).map(e => {
         const validSets = (e.sets || []).filter(x => x.weight || x.reps);
         if (!validSets.length) return null;
-        const setsStr = validSets.map(st => `${st.weight||'-'}kg×${st.reps||'-'}`).join(' · ');
-        return `<div style="direction:ltr;text-align:left;font-size:0.78rem;padding:2px 0"><strong>${escapeHtml(e.name)}:</strong> ${setsStr}</div>`;
-      }).filter(Boolean).join('');
-      const totalSets = (s.exercises || []).reduce((sum, e) => sum + (e.sets ? e.sets.filter(x => x.weight || x.reps).length : 0), 0);
+        const setsStr = validSets.map(st => `${st.weight||'-'}×${st.reps||'-'}`).join(' · ');
+        return `${e.name}: ${setsStr}`;
+      }).filter(Boolean).join(' | ') || '—';
       const acts = s.activities || [];
       const doneActs = acts.filter(a => a.done);
-      const actsHtml = acts.length ? `
-        <div style="margin-top:6px;padding-top:6px;border-top:1px dashed var(--border);font-size:0.78rem">
-          <strong style="color:var(--text-muted)">الأنشطة (${doneActs.length}/${acts.length}):</strong>
-          ${acts.map(a => `<span class="badge" style="background:${a.done?'var(--accent)':'var(--shade-3)'};color:${a.done?'var(--surface)':'var(--text-muted)'};margin:2px 4px 2px 0">${a.done?'✓':'○'} ${escapeHtml(a.text)}</span>`).join('')}
-        </div>` : '';
-      const dayIdx = new Date(s.date + 'T00:00:00').getDay();
+      const actSummary = acts.length
+        ? `${doneActs.length}/${acts.length} · ${acts.map(a => (a.done?'✓ ':'○ ') + a.text).join(' / ')}`
+        : '—';
       return `
-        <div class="history-item" style="flex-direction:column;align-items:stretch;gap:0">
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
-            <div><span class="badge ${cls}">W ${s.workout}</span><strong>${DAYS[dayIdx]} · ${formatArabicDate(s.date)}</strong></div>
-            <button class="btn-danger btn-sm" data-del-session="${realIdx}" aria-label="حذف">✕</button>
-          </div>
-          <div style="color:var(--text-muted);font-size:0.78rem;margin-top:2px">${totalSets} مجموعات منجزة</div>
-          ${exLines ? `<div style="margin-top:6px;padding-top:6px;border-top:1px dashed var(--border)">${exLines}</div>` : ''}
-          ${actsHtml}
-          ${s.notes ? `<div style="font-size:0.78rem;color:var(--text-muted);margin-top:6px;padding-top:6px;border-top:1px dashed var(--border);font-style:italic">📝 ${escapeHtml(s.notes)}</div>` : ''}
-        </div>
+        <tr>
+          <td data-label="التاريخ">
+            <div style="font-weight:700;font-size:0.82rem">${formatShortDate(s.date)}</div>
+            <div style="font-size:0.7rem;color:var(--text-muted)">${DAYS[dayIdx]}</div>
+          </td>
+          <td data-label="التمرين"><span class="badge ${cls}">W ${s.workout}</span></td>
+          <td data-label="تفاصيل التمارين" class="cell-ltr">${escapeHtml(exDetail)}</td>
+          <td data-label="الأنشطة">${escapeHtml(actSummary)}</td>
+          <td data-label="" class="cell-action"><button class="btn-danger btn-sm" data-del-session="${realIdx}" aria-label="حذف">✕</button></td>
+        </tr>
+        ${s.notes ? `<tr class="note-row"><td colspan="5" style="font-size:0.75rem;color:var(--text-muted);font-style:italic;padding:4px 10px">📝 ${escapeHtml(s.notes)}</td></tr>` : ''}
       `;
     }).join('');
+    hist.innerHTML = `
+      <table class="history-table">
+        <thead>
+          <tr>
+            <th>التاريخ</th>
+            <th>النوع</th>
+            <th>تفاصيل التمارين</th>
+            <th>الأنشطة</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
     hist.querySelectorAll('[data-del-session]').forEach(b => {
       b.onclick = () => {
         if (confirm('حذف هذه الجلسة من السجل؟')) {
