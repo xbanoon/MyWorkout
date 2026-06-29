@@ -148,6 +148,23 @@
   .type-B { background: var(--primary-light); color: var(--surface); }
   .type-rest { background: var(--shade-3); color: var(--text-muted); }
   .day-status { margin-top: 4px; font-size: 1.1rem; }
+  .day-activities {
+    margin-top: 6px;
+    text-align: right;
+    font-size: 0.68rem;
+    line-height: 1.4;
+    color: var(--text-muted);
+    border-top: 1px dashed var(--border);
+    padding-top: 4px;
+  }
+  .day-activities .act {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 1px 0;
+  }
+  .day-activities .act.done { text-decoration: line-through; opacity: 0.6; }
 
   /* Workout */
   .workout-header {
@@ -739,14 +756,20 @@ function renderSchedule() {
     const typeLabel = type === 'rest' ? 'راحة' : 'Workout ' + type;
     const dateStr = getDateForDay(i);
     const done = state.sessions.some(s => s.date === dateStr);
-    const actCount = (state.activities[k] || []).length;
-    const actDone = (state.activities[k] || []).filter(a => a.done).length;
+    const dayActs = state.activities[k] || [];
+    const actCount = dayActs.length;
+    const actDone = dayActs.filter(a => a.done).length;
+    const actsHtml = actCount ? `
+      <div class="day-activities">
+        ${dayActs.map(a => `<span class="act ${a.done ? 'done' : ''}" title="${escapeHtml(a.text)}">${a.done ? '✓ ' : '• '}${escapeHtml(a.text)}</span>`).join('')}
+        <div style="font-size:0.65rem;margin-top:3px;font-weight:600">${actDone}/${actCount}</div>
+      </div>` : '';
     card.innerHTML = `
       <div class="day-name" role="button" tabindex="0">${DAYS[i]}</div>
       <div style="font-size:0.7rem;color:var(--text-muted);margin-top:2px">${formatShortDate(dateStr)}</div>
       <div class="day-type ${typeClass}" role="button" tabindex="0">${typeLabel}</div>
       <div class="day-status" aria-label="${done ? 'مكتمل' : 'غير مكتمل'}">${done ? '✅' : (type==='rest'?'😴':'⏳')}</div>
-      ${actCount ? `<div style="font-size:0.7rem;color:var(--text-muted);margin-top:4px">${actDone}/${actCount}</div>` : ''}
+      ${actsHtml}
     `;
     card.onclick = (e) => {
       // Don't override children's specific click
