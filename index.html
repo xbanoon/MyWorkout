@@ -473,6 +473,63 @@
     min-height: 0;
   }
 
+  /* Auth overlay */
+  .auth-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(6px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 3000;
+    padding: 16px;
+  }
+  .auth-overlay.show { display: flex; }
+  .auth-box {
+    background: var(--surface);
+    border-radius: 14px;
+    padding: 24px;
+    width: 100%;
+    max-width: 380px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    color: var(--text);
+  }
+  .auth-box h2 {
+    text-align: center;
+    color: var(--accent);
+    margin-bottom: 4px;
+  }
+  .auth-box input {
+    width: 100%;
+    margin-bottom: 8px;
+  }
+  .auth-error {
+    color: var(--danger);
+    background: rgba(220,38,38,0.08);
+    border-radius: 6px;
+    padding: 8px 10px;
+    margin-bottom: 10px;
+    font-size: 0.82rem;
+    display: none;
+  }
+  .auth-error.show { display: block; }
+  .sync-status {
+    position: fixed;
+    bottom: 12px;
+    right: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    z-index: 100;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .sync-status.show { opacity: 1; }
+
   /* Toast */
   .toast-container {
     position: fixed;
@@ -702,7 +759,11 @@
 <div class="container">
   <header>
     <h1>🏋️ تماريني — المرحلة الأولى</h1>
-    <button class="theme-toggle" id="themeToggle" aria-label="تبديل السمة">🌙</button>
+    <div style="display:flex;gap:6px;align-items:center">
+      <span id="userBadge" style="font-size:0.75rem;opacity:0.9;display:none;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+      <button class="theme-toggle" id="signOutBtn" aria-label="تسجيل خروج" style="display:none" title="تسجيل خروج">⎋</button>
+      <button class="theme-toggle" id="themeToggle" aria-label="تبديل السمة">🌙</button>
+    </div>
   </header>
   <div class="tabs" role="tablist">
     <div class="tab active" data-tab="schedule" role="tab">📅 الجدول</div>
@@ -792,6 +853,22 @@
 
 <!-- Toast -->
 <div class="toast-container" id="toastContainer" aria-live="polite"></div>
+
+<!-- Auth Overlay -->
+<div class="auth-overlay" id="authOverlay">
+  <div class="auth-box">
+    <h2>🏋️ تماريني</h2>
+    <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:14px">سجّل دخول لمزامنة بياناتك بين أجهزتك</p>
+    <div id="authError" class="auth-error"></div>
+    <input type="email" id="authEmail" placeholder="البريد الإلكتروني" autocomplete="email">
+    <input type="password" id="authPassword" placeholder="كلمة المرور (6 أحرف على الأقل)" autocomplete="current-password">
+    <button id="authLoginBtn" class="btn-success" style="width:100%;margin-top:8px">دخول</button>
+    <button id="authSignupBtn" class="btn-ghost" style="width:100%;margin-top:6px">إنشاء حساب جديد</button>
+    <button id="authResetBtn" class="btn-ghost btn-sm" style="width:100%;margin-top:10px;background:transparent;border:none;color:var(--text-muted);font-size:0.8rem">نسيت كلمة المرور؟</button>
+    <hr style="margin:14px 0;border:none;border-top:1px solid var(--border)">
+    <button id="authSkipBtn" class="btn-ghost btn-sm" style="width:100%">استخدام بدون مزامنة (محلي فقط)</button>
+  </div>
+</div>
 
 <script>
 'use strict';
@@ -913,7 +990,18 @@ function ensurePlan(isoDate) {
 function save() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
   catch (e) { toast('فشل الحفظ — قد تكون مساحة التخزين ممتلئة', 'error'); }
+  if (window.cloudPush) window.cloudPush(state);
 }
+window.applyRemoteState = function(remote) {
+  if (!remote) return;
+  state = remote;
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
+  applyTheme();
+  renderSchedule();
+  renderWorkout();
+  if (document.getElementById('dashboard').classList.contains('active')) renderDashboard();
+};
+window.getLocalState = () => state;
 
 function $(id) { return document.getElementById(id); }
 function escapeHtml(s) {
@@ -1757,6 +1845,181 @@ if ('serviceWorker' in navigator) {
 // Init
 renderSchedule();
 renderWorkout();
+</script>
+
+<div class="sync-status" id="syncStatus"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
+import {
+  getAuth, onAuthStateChanged, signInWithEmailAndPassword,
+  createUserWithEmailAndPassword, signOut, sendPasswordResetEmail
+} from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
+import {
+  getFirestore, doc, getDoc, setDoc, onSnapshot, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAb0ig1dw3aHzl6gpoiTNlMnFNu16oSi18",
+  authDomain: "tamarini-ab.firebaseapp.com",
+  projectId: "tamarini-ab",
+  storageBucket: "tamarini-ab.firebasestorage.app",
+  messagingSenderId: "1012224983724",
+  appId: "1:1012224983724:web:dd72a762b3e63b75145509"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+const $ = (id) => document.getElementById(id);
+const overlay = $('authOverlay');
+const errorBox = $('authError');
+const syncStatus = $('syncStatus');
+
+let currentUser = null;
+let unsubscribeSnapshot = null;
+let pushTimer = null;
+let applyingRemote = false;
+let lastPushedJson = null;
+
+function showError(msg) {
+  errorBox.textContent = msg;
+  errorBox.classList.add('show');
+  setTimeout(() => errorBox.classList.remove('show'), 5000);
+}
+function showSync(text, autohide = true) {
+  syncStatus.textContent = text;
+  syncStatus.classList.add('show');
+  if (autohide) setTimeout(() => syncStatus.classList.remove('show'), 1800);
+}
+function friendlyError(code) {
+  const map = {
+    'auth/invalid-email': 'البريد الإلكتروني غير صالح',
+    'auth/missing-password': 'الرجاء إدخال كلمة المرور',
+    'auth/weak-password': 'كلمة المرور قصيرة جداً (6 أحرف على الأقل)',
+    'auth/email-already-in-use': 'هذا البريد مسجّل مسبقاً — جرّب تسجيل الدخول',
+    'auth/invalid-credential': 'بريد إلكتروني أو كلمة مرور خاطئة',
+    'auth/wrong-password': 'كلمة المرور خاطئة',
+    'auth/user-not-found': 'لا يوجد حساب بهذا البريد',
+    'auth/network-request-failed': 'تحقق من اتصال الإنترنت',
+    'auth/too-many-requests': 'محاولات كثيرة — انتظر قليلاً ثم أعد المحاولة'
+  };
+  return map[code] || 'حدث خطأ — حاول مجدداً';
+}
+
+// Auth handlers
+$('authLoginBtn').onclick = async () => {
+  try {
+    await signInWithEmailAndPassword(auth, $('authEmail').value.trim(), $('authPassword').value);
+  } catch (e) { showError(friendlyError(e.code)); }
+};
+$('authSignupBtn').onclick = async () => {
+  try {
+    await createUserWithEmailAndPassword(auth, $('authEmail').value.trim(), $('authPassword').value);
+  } catch (e) { showError(friendlyError(e.code)); }
+};
+$('authResetBtn').onclick = async () => {
+  const em = $('authEmail').value.trim();
+  if (!em) return showError('اكتب بريدك الإلكتروني أولاً');
+  try {
+    await sendPasswordResetEmail(auth, em);
+    showError('تم إرسال رابط إعادة التعيين إلى بريدك');
+  } catch (e) { showError(friendlyError(e.code)); }
+};
+$('authSkipBtn').onclick = () => {
+  overlay.classList.remove('show');
+};
+$('signOutBtn').onclick = async () => {
+  if (!confirm('تسجيل خروج؟ (البيانات تبقى محفوظة في السحابة)')) return;
+  await signOut(auth);
+};
+
+// Sync logic
+function userDocRef(uid) { return doc(db, 'users', uid, 'data', 'state'); }
+
+async function initialSync(uid) {
+  showSync('جاري المزامنة…', false);
+  try {
+    const snap = await getDoc(userDocRef(uid));
+    const local = window.getLocalState();
+    if (snap.exists()) {
+      const cloud = snap.data().state;
+      const cloudT = snap.data().updatedAt?.toMillis?.() || 0;
+      const localT = local._updatedAt || 0;
+      if (cloudT >= localT) {
+        applyingRemote = true;
+        window.applyRemoteState(cloud);
+        applyingRemote = false;
+        showSync('✓ تمت المزامنة من السحابة');
+      } else {
+        await pushNow(local);
+        showSync('✓ تم رفع البيانات المحلية');
+      }
+    } else {
+      await pushNow(local);
+      showSync('✓ تم رفع البيانات لأول مرة');
+    }
+  } catch (e) {
+    console.error(e);
+    showSync('⚠ تعذرت المزامنة — العمل أوفلاين', true);
+  }
+  // Live listener
+  unsubscribeSnapshot = onSnapshot(userDocRef(uid), (snap) => {
+    if (!snap.exists()) return;
+    const cloud = snap.data().state;
+    const cloudJson = JSON.stringify(cloud);
+    if (cloudJson === lastPushedJson) return; // own write echo
+    applyingRemote = true;
+    window.applyRemoteState(cloud);
+    applyingRemote = false;
+    showSync('↻ تحديث من جهاز آخر');
+  }, (err) => console.error('snapshot error', err));
+}
+
+async function pushNow(s) {
+  if (!currentUser) return;
+  s._updatedAt = Date.now();
+  const json = JSON.stringify(s);
+  lastPushedJson = json;
+  await setDoc(userDocRef(currentUser.uid), { state: s, updatedAt: serverTimestamp() });
+}
+
+window.cloudPush = (s) => {
+  if (!currentUser || applyingRemote) return;
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(async () => {
+    try {
+      await pushNow(s);
+      showSync('☁ تم الحفظ');
+    } catch (e) {
+      console.error(e);
+      showSync('⚠ تعذر الحفظ في السحابة');
+    }
+  }, 600);
+};
+
+onAuthStateChanged(auth, async (user) => {
+  if (user) {
+    currentUser = user;
+    overlay.classList.remove('show');
+    $('userBadge').textContent = user.email;
+    $('userBadge').style.display = 'inline';
+    $('signOutBtn').style.display = 'inline-flex';
+    await initialSync(user.uid);
+  } else {
+    currentUser = null;
+    if (unsubscribeSnapshot) { unsubscribeSnapshot(); unsubscribeSnapshot = null; }
+    $('userBadge').style.display = 'none';
+    $('signOutBtn').style.display = 'none';
+    overlay.classList.add('show');
+  }
+});
+
+// Allow Enter key in password field
+$('authPassword').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') $('authLoginBtn').click();
+});
 </script>
 </body>
 </html>
